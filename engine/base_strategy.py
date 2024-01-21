@@ -7,6 +7,14 @@ class BaseStrategy:
         self.auto_update_hist = True
     
     @property
+    def symbol(self):
+        return self.engine.opts.symbol
+    
+    @property
+    def opts(self):
+        return self.engine.opts
+
+    @property
     def hist(self)->pd.DataFrame:
         return self.engine._hist
     
@@ -24,6 +32,12 @@ class BaseStrategy:
     def pre_init(self):
         pass
     def post_init(self):
+        pass
+
+    def pre_open_order(self, order):
+        pass
+
+    def post_open_order(self, order):
         pass
 
     def on_tick(self, tick):

@@ -43,6 +43,7 @@ PROCESS_TIMEOUT_MS = 10 * 1000  # on_tick 超时时间， 超时处理将会在 
 API_KEY_PREFIX = "API_"
 
 class BaseOptions(pydantic.BaseModel):
+    symbol: str = "ETHUSDT"
     proxy_url: str = None
     process_timeout_ms: int =PROCESS_TIMEOUT_MS
     api_key_prefix: str = API_KEY_PREFIX
@@ -85,6 +86,23 @@ class BaseEngine:
         init history klines
         """
         self._hist = Fake.hist()
+    
+    async def _open_order(self, order):
+        pass
+
+    async def open_order(self, order):
+        """
+        open order
+        """
+        self.strategy.pre_open_order(order)
+        await self._open_order(order)
+        self.strategy.post_open_order(order)
+
+    def close_order(self, order_id):
+        pass
+
+    def close_all_order(self, order_id):
+        pass
 
     async def update_hist(self):
         """

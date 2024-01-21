@@ -24,6 +24,9 @@ class SecretKeys:
             cls.key_path.touch()
         with open(cls.key_path, "r") as f:
             for line in f:
+                line = line.strip()
+                if line.startswith("#"):
+                    continue
                 cols = line.split("=", 1)
                 if len(cols) < 2:
                     cls._keys[cols[0].strip()] = ""

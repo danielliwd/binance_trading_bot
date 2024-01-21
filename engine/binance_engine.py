@@ -120,9 +120,7 @@ class BinanceFutureEngine(BaseEngine):
         self.strategy.on_update_hist()
         last_t = self._hist.iloc[-2]["t"]
         klines = await self.get_kline(start_str=int(last_t))
-        print(klines)
         self._hist.combine_first(klines)
-        print(self._hist[:10])
     
     def hist_need_auto_update(self):
         """
@@ -170,6 +168,13 @@ class BinanceFutureEngine(BaseEngine):
         return {
             "continuous_kline": self.strategy.on_tick,
         }
+    
+    async def _open_order(self, order):
+        print(order)
+        pass
+
+    async def close_all_order(self):
+        await self.async_client.futures_cancel_orders(symbol=self.opts.symbol)
 
 # %%
     
