@@ -1,6 +1,5 @@
 import asyncio
 import pandas as pd
-import time
 
 import pandas_ta
 from engine.base_strategy import BaseStrategy
@@ -45,7 +44,7 @@ class NmacdRsiStrategy(BaseStrategy):
     def trigger_signal_open_order(self):
         open_order_condition = False  # do your check
         if open_order_condition:
-            task = asyncio.get_event_loop().create_task(self.engine.open_order(None))
+            asyncio.get_event_loop().create_task(self.engine.open_order(None))
 
     def create_order(self, signal_kline_index):
         signal = self.enhanced.loc[signal_kline_index]["enhanced"]
@@ -143,5 +142,5 @@ if __name__ == "__main__":
     import sys
 
     symbol = sys.argv[1] if len(sys.argv) > 1 else "LINKUSDT"
-    test = True if len(sys.argv) > 2 and sys.argv[2] == "product" else False
+    test = False if len(sys.argv) > 2 and sys.argv[2] == "product" else True
     main(symbol, test)
