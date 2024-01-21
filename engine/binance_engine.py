@@ -127,6 +127,9 @@ class BinanceFutureEngine(BaseEngine):
         """
         是否需要更新历史数据
         """
+        last_update_hist_t = self._runtime.get("last_update_hist_t")
+        if not last_update_hist_t:
+            return True
         last_hist_t = self._hist.iloc[-1]["t"] / 1000
         last_update_hist_t = self._runtime.get("last_update_hist_t", last_hist_t)
         now = time.time()

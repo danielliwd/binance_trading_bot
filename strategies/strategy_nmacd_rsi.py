@@ -16,7 +16,7 @@ class NmacdRsiStrategy(BaseStrategy):
         super().__init__()
         self.enhanced = None
         self.bot = None
-        self._last_signal_time = 0
+        self._last_signal_time = None
 
     async def on_tick(self, tick):
         print("---- tick -----", tick)
@@ -35,14 +35,17 @@ class NmacdRsiStrategy(BaseStrategy):
         df["enhanced"] = enhanced
         self.enhanced = df
 
-        open_order_condition = True  # do your check
+    def trigger_signal_open_order(self):
+        open_order_condition = False # do your check
         if open_order_condition:
             task = asyncio.get_event_loop().create_task(self.engine.open_order(None))
 
     def post_update_hist(self):
         self.update_indicators()
-    
-    def pre_open_order(self, order):
+        self.notice_signal()
+        self.trigger_signal_open_order()
+
+    def notice_signal(self):
         tg_token = SecretKeys.get("TELEGRAM_BOT_TOKEN")
         chat_id = SecretKeys.get("TG_CHAT_ID_ORDER")
         if not self.bot:
@@ -56,10 +59,14 @@ class NmacdRsiStrategy(BaseStrategy):
                 last_signal_str = f"{s.name} {self.symbol} {buy_sell}"
         else:
             s = self.enhanced.iloc[-1]
-            if s.enhanced != 0:
+            if s.enhanced != 0 and self.hist[-1]["t"] > self._last_signal_time * 1000:
                 buy_sell = "买" if s.enhanced > 0 else "卖"
                 last_signal_str = f"{s.name} {self.symbol} {buy_sell}"
+                self._last_signal_time = time.time()
         asyncio.get_event_loop().create_task(self.bot.send_message(chat_id=chat_id, text="NMACD_RSI策略: %s" % last_signal_str))
+    
+    def pre_open_order(self, order):
+        print("---open order ----")
 
 
 
