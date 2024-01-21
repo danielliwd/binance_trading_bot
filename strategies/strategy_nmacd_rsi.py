@@ -48,6 +48,7 @@ class NmacdRsiStrategy(BaseStrategy):
     def notice_signal(self):
         tg_token = SecretKeys.get("TELEGRAM_BOT_TOKEN")
         chat_id = SecretKeys.get("TG_CHAT_ID_ORDER")
+        test="" if not self.engine.opts.test else "[测试]: "
         if not self.bot:
             self.bot = get_bot(tg_token, self.engine.opts.proxy_url)
         last_signal_str = ""
@@ -56,12 +57,12 @@ class NmacdRsiStrategy(BaseStrategy):
             if not last_signal.empty:
                 s = last_signal.iloc[-1]
                 buy_sell = "买" if s.enhanced > 0 else "卖"
-                last_signal_str = f"{s.name} {self.symbol} {buy_sell}"
+                last_signal_str = f"{test}{s.name} {self.symbol} {buy_sell}"
         else:
             s = self.enhanced.iloc[-1]
             if s.enhanced != 0 and self.hist[-1]["t"] > self._last_signal_time * 1000:
                 buy_sell = "买" if s.enhanced > 0 else "卖"
-                last_signal_str = f"{s.name} {self.symbol} {buy_sell}"
+                last_signal_str = f"{test}{s.name} {self.symbol} {buy_sell}"
                 self._last_signal_time = time.time()
         asyncio.get_event_loop().create_task(self.bot.send_message(chat_id=chat_id, text="NMACD_RSI策略: %s" % last_signal_str))
     
@@ -70,7 +71,7 @@ class NmacdRsiStrategy(BaseStrategy):
 
 
 
-def main(symbol):
+def main(symbol, test=True):
     strategy = NmacdRsiStrategy()
     strategy.auto_update_hist = True
     engine = BinanceFutureEngine(
@@ -81,6 +82,7 @@ def main(symbol):
             proxy_url="http://127.0.0.1:7890",
             hist_interval="1h", 
             hist_start_str="20 day ago UTC",
+            test=test,
         ),
     )
     asyncio.run(engine.run())
@@ -88,5 +90,6 @@ def main(symbol):
 
 if __name__ == "__main__":
     import sys
-    symbol = sys.argv[1] if len(sys.argv[1:]) else "ETHUSDT"
-    main(symbol)
+    symbol = sys.argv[1] if len(sys.argv)>1 else "ETHUSDT"
+    test = False if len(sys.argv[1:]) > 2 and sys.argv[2]=="product" else True
+    main(symbol, test)

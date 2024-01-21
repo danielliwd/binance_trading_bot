@@ -47,6 +47,7 @@ class BaseOptions(pydantic.BaseModel):
     proxy_url: str = None
     process_timeout_ms: int =PROCESS_TIMEOUT_MS
     api_key_prefix: str = API_KEY_PREFIX
+    test: bool = False
 
 class BaseEngine:
     """
