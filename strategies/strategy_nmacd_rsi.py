@@ -143,5 +143,5 @@ if __name__ == "__main__":
     import sys
 
     symbol = sys.argv[1] if len(sys.argv) > 1 else "LINKUSDT"
-    test = False if len(sys.argv[1:]) > 2 and sys.argv[2] == "product" else True
+    test = True if len(sys.argv) > 2 and sys.argv[2] == "product" else False
     main(symbol, test)

@@ -202,6 +202,19 @@ class BaseEngine:
                 await self._update_hist_fut
                 await asyncio.sleep(10)
 
+    async def _update_order_status(self):
+        pass
+                
+    async def _update_order_status_loop(self):
+        while True:
+            try:
+                await self._update_order_status()
+                self._runtime["last_update_order_t"] = time.time()
+                await asyncio.sleep(600)
+
+            except Exception as e:
+                logger.exception(e)
+
     async def _message_loop(self):
         dispatcher = self._get_dispatcher()
         async for content in self.subscribe():
