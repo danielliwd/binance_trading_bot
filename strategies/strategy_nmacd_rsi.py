@@ -39,9 +39,8 @@ class NmacdRsiStrategy(BaseStrategy):
         df = pd.merge(nmacd_cross, rsi_cross, left_index=True, right_index=True)
         df["enhanced"] = enhanced
         self.enhanced = df
-        ma2 = pandas_ta.sma(self.hist["c"], 2)
-        self.enhanced["ma2min"] = ma2.rolling(10).min()
-        self.enhanced["ma2max"] = ma2.rolling(10).max()
+        self.enhanced["ma2min"] = pandas_ta.sma(self.hist["l"], 2).rolling(10).min()
+        self.enhanced["ma2max"] = pandas_ta.sma(self.hist["h"], 2).rolling(10).max()
 
     def trigger_signal_open_order(self):
         open_order_condition = False  # do your check
@@ -107,14 +106,17 @@ class NmacdRsiStrategy(BaseStrategy):
             if s.enhanced != 0 and self.hist[-1]["t"] > self._last_signal_time * 1000:
                 order = self._test_create_order(s.name)
         if order:
-            self.hist.to_csv("tmp_hist_%s.csv" % self.symbol)
-            self.enhanced.to_csv("tmp_signals_%s.csv" % self.symbol)
-            asyncio.get_event_loop().create_task(
-                self.bot.send_message(
-                    chat_id=chat_id,
-                    text="NMACD_RSI策略%s: %s" % (test_str, order.hint_str),
+            if self.engine.opts.test:
+                print(order.hint_str)
+                self.hist.to_csv("tmp_hist_%s.csv" % self.symbol)
+                self.enhanced.to_csv("tmp_signals_%s.csv" % self.symbol)
+            else:
+                asyncio.get_event_loop().create_task(
+                    self.bot.send_message(
+                        chat_id=chat_id,
+                        text="NMACD_RSI策略%s: %s" % (test_str, order.hint_str),
+                    )
                 )
-            )
 
     def pre_open_order(self, order):
         print("---open order ----")
@@ -140,6 +142,6 @@ def main(symbol, test=True):
 if __name__ == "__main__":
     import sys
 
-    symbol = sys.argv[1] if len(sys.argv) > 1 else "ETHUSDT"
+    symbol = sys.argv[1] if len(sys.argv) > 1 else "LINKUSDT"
     test = False if len(sys.argv[1:]) > 2 and sys.argv[2] == "product" else True
     main(symbol, test)
