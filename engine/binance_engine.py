@@ -119,15 +119,24 @@ class BinanceFutureEngine(BaseEngine):
         for col in ["o", "h", "l", "c", "v", "q"]:
             klines_df[col] = klines_df[col].astype(float)
         return klines_df
+    
+    def _remove_current_kline(self, klines):
+        t = kline_interval_map[self.opts.hist_interval]
+        now = int(time.time())
+        if int(klines.iloc[-1].t / 1000)== now - now % t:
+            return klines.iloc[:-1]
+        return klines
 
     async def init_hist(self):
         self._hist = await self.get_kline()
+        self._hist = self._remove_current_kline(self._hist)
 
     async def update_hist(self):
         self.strategy.on_update_hist()
         last_t = self._hist.iloc[-2]["t"]
         klines = await self.get_kline(start_str=int(last_t))
         self._hist.combine_first(klines)
+        self._hist = self._remove_current_kline(self._hist)
         self._runtime["last_update_hist_t"] = time.time()
 
     def hist_need_auto_update(self):

@@ -165,6 +165,7 @@ class BaseEngine:
                 self._trading_strategy(dispatcher, contents)
             )
         else:
+            # skip message if process is not done
             self.strategy.on_tick_latency(contents)
 
     def hist_need_auto_update(self):

@@ -16,10 +16,11 @@ class NmacdRsiStrategy(BaseStrategy):
         super().__init__()
         self.enhanced = None
         self.bot = None
-        self._last_signal_time = None
+        self._last_signal_ms = None
 
     async def on_tick(self, tick):
         print("---- tick -----", tick)
+        print("---- hist -----", self.hist.tail(2).to_json())
 
         open_order_condition = False  # do your check
         if open_order_condition:
@@ -95,15 +96,18 @@ class NmacdRsiStrategy(BaseStrategy):
         order = None
         if not self.bot:
             self.bot = get_bot(tg_token, self.engine.opts.proxy_url)
-        if not self._last_signal_time:
+        if not self._last_signal_ms:
             last_signal = self.enhanced[self.enhanced.enhanced != 0]
             if not last_signal.empty:
                 s = last_signal.iloc[-1]
                 order = self._test_create_order(s.name)
+            self._last_signal_ms = pd.to_datetime(s.name).timestamp() * 1000
+            self.hist.loc[s.name].t
         else:
             s = self.enhanced.iloc[-1]
-            if s.enhanced != 0 and self.hist[-1]["t"] > self._last_signal_time * 1000:
+            if s.enhanced != 0 and self.hist.iloc[-1]["t"] > self._last_signal_ms:
                 order = self._test_create_order(s.name)
+                self._last_signal_ms = self.hist.iloc[-1]["t"]
         if order:
             if self.engine.opts.test:
                 print(order.hint_str)
@@ -141,6 +145,6 @@ def main(symbol, test=True):
 if __name__ == "__main__":
     import sys
 
-    symbol = sys.argv[1] if len(sys.argv) > 1 else "LINKUSDT"
+    symbol = sys.argv[1] if len(sys.argv) > 1 else "AUCTIONUSDT"
     test = False if len(sys.argv) > 2 and sys.argv[2] == "product" else True
     main(symbol, test)
