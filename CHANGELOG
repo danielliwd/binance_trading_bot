@@ -1,0 +1,15 @@
+
+CHANGELOG
+
+## 2023-01-21
+1. 引擎、策略框架初步搭成, 暂无下单功能
+    通过1小时数据驱动 on_tick
+    通过自动更新机制更新 self.hist(ohlcv数据)
+    通过hook: self.post_update_hist, 可做指标计算
+    
+2. 实现币安永续引擎
+3. 在币安永续引擎上加载nmacd_cross/rsi_cross双指标
+4. 一些有用指标算法: 
+    enhanced_signal, 将两个信号叠加成一个更强的信号，针对信号前后出现问题，有一个windows参数，只要在windows内同时出现两个同向信号，则输出增加信号
+    
+    

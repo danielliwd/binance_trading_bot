@@ -1,1 +1,14 @@
+# 敏感文件
 *.tmp
+.keys
+.env
+
+# tmp files
+tmp_*
+
+# editor
+.vscode/launch.json
+
+# python
+__pycache__
+.python-version

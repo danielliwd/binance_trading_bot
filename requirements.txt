@@ -1,0 +1,6 @@
+python-binance==1.0.19
+pandas==2.1.4
+pandas-ta==0.3.14b0
+numpy==1.26.3
+pydantic==2.5.3
+pydantic_core==2.14.6
