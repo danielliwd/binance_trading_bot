@@ -19,6 +19,12 @@ exoprt PROXY_URL="http://127.0.0.1"
 python -m strategies/strategy_nmacd_rsi
 ```
 
+```bash
+pip install python-dotenv[cli]
+touch .env
+dotenv python -m strategies/strategy_nmacd_rsi
+```
+
 ## support
 
 create issue, no mr/pr.

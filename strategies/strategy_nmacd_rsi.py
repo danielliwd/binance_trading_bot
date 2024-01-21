@@ -1,5 +1,4 @@
 import asyncio
-import sys
 import pandas as pd
 import time
 
@@ -17,6 +16,7 @@ class NmacdRsiStrategy(BaseStrategy):
         super().__init__()
         self.enhanced = None
         self.bot = None
+        self._last_signal_time = 0
 
     async def on_tick(self, tick):
         print("---- tick -----", tick)
@@ -47,17 +47,23 @@ class NmacdRsiStrategy(BaseStrategy):
         chat_id = SecretKeys.get("TG_CHAT_ID_ORDER")
         if not self.bot:
             self.bot = get_bot(tg_token, self.engine.opts.proxy_url)
-        last_signal = self.enhanced[self.enhanced.enhanced != 0]
-        if not last_signal.empty:
-            s = last_signal.iloc[-1]
-            buy_sell = "买" if s.enhanced > 0 else "卖"
-            last_signal_str = f"{s.name} {self.symbol} {buy_sell}"
-            asyncio.get_event_loop().create_task(self.bot.send_message(chat_id=chat_id, text="NMACD_RSI策略: %s" % last_signal_str))
+        last_signal_str = ""
+        if not self._last_signal_time:
+            last_signal = self.enhanced[self.enhanced.enhanced != 0]
+            if not last_signal.empty:
+                s = last_signal.iloc[-1]
+                buy_sell = "买" if s.enhanced > 0 else "卖"
+                last_signal_str = f"{s.name} {self.symbol} {buy_sell}"
+        else:
+            s = self.enhanced.iloc[-1]
+            if s.enhanced != 0:
+                buy_sell = "买" if s.enhanced > 0 else "卖"
+                last_signal_str = f"{s.name} {self.symbol} {buy_sell}"
+        asyncio.get_event_loop().create_task(self.bot.send_message(chat_id=chat_id, text="NMACD_RSI策略: %s" % last_signal_str))
 
 
 
-def main():
-    symbol = sys.argv[1]
+def main(symbol):
     strategy = NmacdRsiStrategy()
     strategy.auto_update_hist = True
     engine = BinanceFutureEngine(
@@ -74,4 +80,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    symbol = sys.argv[1] if len(sys.argv[1:]) else "ETHUSDT"
+    main(symbol)

@@ -76,6 +76,7 @@ class BaseEngine:
         self._hist = None
         self._last_fut = None
         self._update_hist_fut = None
+        self._runtime = {}
 
     def init_client(self):
         self.async_client = None

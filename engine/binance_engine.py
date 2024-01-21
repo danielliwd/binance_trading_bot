@@ -121,17 +121,20 @@ class BinanceFutureEngine(BaseEngine):
         last_t = self._hist.iloc[-2]["t"]
         klines = await self.get_kline(start_str=int(last_t))
         self._hist.combine_first(klines)
+        self._runtime["last_update_hist_t"] = time.time()
     
     def hist_need_auto_update(self):
         """
         是否需要更新历史数据
         """
-        last_t = self._hist.iloc[-1]["t"] / 1000
+        last_hist_t = self._hist.iloc[-1]["t"] / 1000
+        last_update_hist_t = self._runtime.get("last_update_hist_t", last_hist_t)
         now = time.time()
         expires_t = kline_interval_map[ self.opts.hist_interval ]
-        # TODO delete
-        expires_t = 60
-        return now - last_t > expires_t
+        if now - last_update_hist_t > expires_t / 2:
+            return True
+
+        return now - last_hist_t > expires_t
 
     async def subscribe(self):
         tick_socket = self.ws_client.kline_futures_socket(
@@ -170,7 +173,6 @@ class BinanceFutureEngine(BaseEngine):
         }
     
     async def _open_order(self, order):
-        print(order)
         pass
 
     async def close_all_order(self):
