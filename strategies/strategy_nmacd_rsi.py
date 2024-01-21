@@ -2,6 +2,7 @@ import asyncio
 import pandas as pd
 import time
 
+import pandas_ta
 from engine.base_strategy import BaseStrategy
 from engine.binance_engine import BinanceFutureEngine, BinanceOptions
 from ta.indictor_nmacd import nmacd_signals
@@ -28,17 +29,61 @@ class NmacdRsiStrategy(BaseStrategy):
         await asyncio.sleep(2)
 
     def update_indicators(self):
-        nmacd_cross = nmacd_signals(self.hist["c"], fast=13, slow=21, signal=9, normalize=50)
+        nmacd_cross = nmacd_signals(
+            self.hist["c"], fast=13, slow=21, signal=9, normalize=50
+        )
         rsi_cross = rsi_cross_signals(self.hist["c"], rsi_length=21, sma_length=55)
-        enhanced = enhanced_signals(nmacd_cross["signal"], rsi_cross["signal"], windows=8)
+        enhanced = enhanced_signals(
+            nmacd_cross["signal"], rsi_cross["signal"], windows=8
+        )
         df = pd.merge(nmacd_cross, rsi_cross, left_index=True, right_index=True)
         df["enhanced"] = enhanced
         self.enhanced = df
+        ma2 = pandas_ta.sma(self.hist["c"], 2)
+        self.enhanced["ma2min"] = ma2.rolling(10).min()
+        self.enhanced["ma2max"] = ma2.rolling(10).max()
 
     def trigger_signal_open_order(self):
-        open_order_condition = False # do your check
+        open_order_condition = False  # do your check
         if open_order_condition:
             task = asyncio.get_event_loop().create_task(self.engine.open_order(None))
+
+    def create_order(self, signal_kline_index):
+        signal = self.enhanced.loc[signal_kline_index]["enhanced"]
+        if signal == 0:
+            return
+
+        dt = (
+            pd.to_datetime(signal_kline_index)
+            .tz_localize("UTC")
+            .tz_convert("Asia/Shanghai")
+        )
+        price = self.hist.loc[signal_kline_index]["c"]
+        stop_loss = 10
+        if signal > 0:
+            buy_sell = "买"
+            stop_loss_price = self.enhanced.loc[signal_kline_index]["ma2min"]
+            order_size = stop_loss / (price - stop_loss_price) * price
+            take_profit_price_1 = price + price - stop_loss_price
+            take_profit_price_2 = price + (price - stop_loss_price) * 2
+        else:
+            buy_sell = "卖"
+            stop_loss_price = self.enhanced.loc[signal_kline_index]["ma2max"]
+            order_size = stop_loss / (stop_loss_price - price) * price
+            take_profit_price_1 = price - (stop_loss_price - price)
+            take_profit_price_2 = price - (stop_loss_price - price) * 2
+
+        order_str = f"{dt.strftime('%Y-%m-%d %H:%M:%SZ+8')} {self.symbol} 以价格{price:.2f} {buy_sell} {order_size:.2f}USDT 止损价 {stop_loss_price:.2f} 1:1止盈价 {take_profit_price_1:.2f}  1:2止盈价 {take_profit_price_2:.2f}"
+
+        class Order:
+            pass
+
+        order = Order()
+        order.hint_str = order_str
+        return order
+
+    def _test_create_order(self, *args, **kwargs):
+        return self.create_order(*args, **kwargs)
 
     def post_update_hist(self):
         self.update_indicators()
@@ -48,27 +93,31 @@ class NmacdRsiStrategy(BaseStrategy):
     def notice_signal(self):
         tg_token = SecretKeys.get("TELEGRAM_BOT_TOKEN")
         chat_id = SecretKeys.get("TG_CHAT_ID_ORDER")
-        test="" if not self.engine.opts.test else "[测试]: "
+        test_str = "" if not self.engine.opts.test else "[测试]"
+        order = None
         if not self.bot:
             self.bot = get_bot(tg_token, self.engine.opts.proxy_url)
-        last_signal_str = ""
         if not self._last_signal_time:
             last_signal = self.enhanced[self.enhanced.enhanced != 0]
             if not last_signal.empty:
                 s = last_signal.iloc[-1]
-                buy_sell = "买" if s.enhanced > 0 else "卖"
-                last_signal_str = f"{test}{s.name} {self.symbol} {buy_sell}"
+                order = self._test_create_order(s.name)
         else:
             s = self.enhanced.iloc[-1]
             if s.enhanced != 0 and self.hist[-1]["t"] > self._last_signal_time * 1000:
-                buy_sell = "买" if s.enhanced > 0 else "卖"
-                last_signal_str = f"{test}{s.name} {self.symbol} {buy_sell}"
-                self._last_signal_time = time.time()
-        asyncio.get_event_loop().create_task(self.bot.send_message(chat_id=chat_id, text="NMACD_RSI策略: %s" % last_signal_str))
-    
+                order = self._test_create_order(s.name)
+        if order:
+            self.hist.to_csv("tmp_hist_%s.csv" % self.symbol)
+            self.enhanced.to_csv("tmp_signals_%s.csv" % self.symbol)
+            asyncio.get_event_loop().create_task(
+                self.bot.send_message(
+                    chat_id=chat_id,
+                    text="NMACD_RSI策略%s: %s" % (test_str, order.hint_str),
+                )
+            )
+
     def pre_open_order(self, order):
         print("---open order ----")
-
 
 
 def main(symbol, test=True):
@@ -80,7 +129,7 @@ def main(symbol, test=True):
             # symbol="ETHUSDT",
             symbol=symbol,
             proxy_url="http://127.0.0.1:7890",
-            hist_interval="1h", 
+            hist_interval="1h",
             hist_start_str="20 day ago UTC",
             test=test,
         ),
@@ -90,6 +139,7 @@ def main(symbol, test=True):
 
 if __name__ == "__main__":
     import sys
-    symbol = sys.argv[1] if len(sys.argv)>1 else "ETHUSDT"
-    test = False if len(sys.argv[1:]) > 2 and sys.argv[2]=="product" else True
+
+    symbol = sys.argv[1] if len(sys.argv) > 1 else "ETHUSDT"
+    test = False if len(sys.argv[1:]) > 2 and sys.argv[2] == "product" else True
     main(symbol, test)

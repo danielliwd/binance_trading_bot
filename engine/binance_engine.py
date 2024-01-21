@@ -1,4 +1,3 @@
-
 from tools.binance_ws_patcher import monkey_patch
 
 # **!重要** binance需要代理, binance ws代理patch.
@@ -23,8 +22,9 @@ HIST_START_STR = "20 day ago UTC"
 
 kline_interval_map = {
     BaseClient.KLINE_INTERVAL_1MINUTE: 60,
-    BaseClient.KLINE_INTERVAL_1HOUR: 60*60,
+    BaseClient.KLINE_INTERVAL_1HOUR: 60 * 60,
 }
+
 
 class BinanceOptions(BaseOptions):
     api_key_prefix: str = API_KEY_PREFIX
@@ -58,22 +58,29 @@ class BinanceKlineTick(pydantic.BaseModel):
     t: int = pydantic.Field(alias="E")
     k: Candle = pydantic.Field(alias="k")
 
+
 class BinanceFutureEngine(BaseEngine):
-    def __init__(self, strategy, api_key=None, api_secret=None, *, opts: BinanceOptions= None):
+    def __init__(
+        self, strategy, api_key=None, api_secret=None, *, opts: BinanceOptions = None
+    ):
         super().__init__(strategy, api_key, api_secret, opts=opts or BinanceOptions())
         self.opts: BinanceOptions
 
     def init_client(self):
-        requests_params= {}
+        requests_params = {}
         if self.opts.proxy_url:
             requests_params["proxy"] = self.opts.proxy_url
-        self.async_client = AsyncClient(api_key=self.api_key, api_secret=self.api_secret, requests_params=requests_params)
+        self.async_client = AsyncClient(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            requests_params=requests_params,
+        )
         self.ws_client = BinanceSocketManager(self.async_client)
         if self.opts.proxy_url:
             self.ws_client.proxy_url = self.opts.proxy_url
         else:
             self.ws_client.proxy_url = None
-    
+
     async def get_kline(self, limit=None, start_str=None):
         kws = {}
         if limit:
@@ -112,30 +119,24 @@ class BinanceFutureEngine(BaseEngine):
         for col in ["o", "h", "l", "c", "v", "q"]:
             klines_df[col] = klines_df[col].astype(float)
         return klines_df
-    
+
     async def init_hist(self):
-        self._hist =  await self.get_kline()
-    
+        self._hist = await self.get_kline()
+
     async def update_hist(self):
         self.strategy.on_update_hist()
         last_t = self._hist.iloc[-2]["t"]
         klines = await self.get_kline(start_str=int(last_t))
         self._hist.combine_first(klines)
         self._runtime["last_update_hist_t"] = time.time()
-    
+
     def hist_need_auto_update(self):
         """
         是否需要更新历史数据
         """
-        last_update_hist_t = self._runtime.get("last_update_hist_t")
-        if not last_update_hist_t:
-            return True
         last_hist_t = self._hist.iloc[-1]["t"] / 1000
-        last_update_hist_t = self._runtime.get("last_update_hist_t", last_hist_t)
         now = time.time()
-        expires_t = kline_interval_map[ self.opts.hist_interval ]
-        if now - last_update_hist_t > expires_t / 2:
-            return True
+        expires_t = kline_interval_map[self.opts.hist_interval]
 
         return now - last_hist_t > expires_t
 
@@ -149,11 +150,10 @@ class BinanceFutureEngine(BaseEngine):
             logging.info("Websocket Connection...")
             time.sleep(1)
             await tick_socket.connect()
-        
+
         async for msg in tick_socket.ws:
             yield msg
 
-    
     def parse_conents(self, contents):
         """
         return <dispatch_type>, <parsed_contents>
@@ -166,7 +166,6 @@ class BinanceFutureEngine(BaseEngine):
             return
         return msg.event, msg
 
-
     def get_dispatcher(self):
         """
         using msg.type as dispatch_type
@@ -174,28 +173,34 @@ class BinanceFutureEngine(BaseEngine):
         return {
             "continuous_kline": self.strategy.on_tick,
         }
-    
+
     async def _open_order(self, order):
         pass
 
     async def close_all_order(self):
         await self.async_client.futures_cancel_orders(symbol=self.opts.symbol)
 
+
 # %%
-    
+
 if __name__ == "__main__":
     from engine.base_strategy import SimpleStrategy
+
     class MyStrategy(SimpleStrategy):
         async def on_tick(self, tick):
             print("---- tick -----", tick)
             await asyncio.sleep(2)
+
         def pre_update_hist(self):
             print("pre update hist")
 
     def test1():
         strategy = MyStrategy()
         strategy.auto_update_hist = True
-        engine = BinanceFutureEngine(MyStrategy(), opts=BinanceOptions(proxy_url="http://127.0.0.1:7890"))
+        engine = BinanceFutureEngine(
+            MyStrategy(), opts=BinanceOptions(proxy_url="http://127.0.0.1:7890")
+        )
         asyncio.run(engine.run())
+
     test1()
 # %%
