@@ -1,4 +1,8 @@
 import asyncio
+import sys
+import pandas as pd
+import time
+
 from engine.base_strategy import BaseStrategy
 from engine.binance_engine import BinanceFutureEngine, BinanceOptions
 from ta.indictor_nmacd import nmacd_signals
@@ -6,8 +10,6 @@ from ta.indictor_rsi_cross import rsi_cross_signals
 from ta.algo import enhanced_signals
 from tools.telegram_bot import get_bot
 from tools.readkeys import SecretKeys
-import pandas as pd
-import time
 
 
 class NmacdRsiStrategy(BaseStrategy):
@@ -55,12 +57,14 @@ class NmacdRsiStrategy(BaseStrategy):
 
 
 def main():
+    symbol = sys.argv[1]
     strategy = NmacdRsiStrategy()
     strategy.auto_update_hist = True
     engine = BinanceFutureEngine(
         NmacdRsiStrategy(),
         opts=BinanceOptions(
-            symbol="ETHUSDT",
+            # symbol="ETHUSDT",
+            symbol=symbol,
             proxy_url="http://127.0.0.1:7890",
             hist_interval="1h", 
             hist_start_str="20 day ago UTC",
