@@ -131,6 +131,7 @@ class BinanceFutureEngine(BaseEngine):
         self.strategy.on_update_hist()
         last_t = self._hist.iloc[-2]["t"]
         klines = await self.get_kline(start_str=int(last_t))
+        self._hist.update(klines)
         self._hist = self._hist.combine_first(klines)
         self._runtime["last_update_hist_t"] = time.time()
 
@@ -182,11 +183,12 @@ class BinanceFutureEngine(BaseEngine):
         pass
 
     async def close_all_position(self):
-        pass
+        pos = await self.async_client.futures_position_information(symbol=self.opts.symbol)
+        print(pos)
+        # TODO:
+        # await self.cancel_all_order()
 
     async def cancel_all_order(self):
-        # TODO
-        return
         await self.async_client.futures_cancel_all_open_orders(symbol=self.opts.symbol)
 
 

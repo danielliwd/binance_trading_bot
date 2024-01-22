@@ -24,6 +24,11 @@ class NmacdRsiStrategy(BaseStrategy):
         print("---- tick -----", tick)
         print("---- hist -----", self.hist.tail(2).to_json())
 
+        # TODO: remove test
+        if self.opts.test:
+            await self.engine.close_all_position()
+            await asyncio.sleep(2)
+
         open_order_condition = False  # do your check
         if open_order_condition:
             await self.engine.open_order(None)
@@ -86,8 +91,9 @@ class NmacdRsiStrategy(BaseStrategy):
         self.update_indicators()
         signal_idx, is_new = self.get_signal_idx()
         if signal_idx:
-            if is_new:
-                task = asyncio.get_event_loop().create_task(self.engine.cancel_all_order())
+            if is_new and self.opts.test:
+                # 只在测试开单
+                task = asyncio.get_event_loop().create_task(self.engine.close_all_positi())
                 task.add_done_callback(lambda _: self.notice_signal(signal_idx))
             else:
                 self.notice_signal(signal_idx)
@@ -99,15 +105,15 @@ class NmacdRsiStrategy(BaseStrategy):
         signal_idx = None
         is_new = True
         is_old = False
-        # TODO delete
-        is_old = True
 
         if not self._last_signal_idx:
             # 从未发过信号
             if self.is_last_hist_kline_closed():
-                signal_df = self.enhanced[self.enhanced.enhanced != 0]
+                signal_df = self.enhanced
             else:
-                signal_df = self.enhanced[self.enhanced.enhanced != 0].iloc[:-1]
+                signal_df = self.enhanced.iloc[:1]
+
+            signal_df = self.enhanced[self.enhanced.enhanced != 0]
 
             if not signal_df.empty:
                 self._last_signal_idx = signal_df.iloc[-1].name
@@ -140,6 +146,7 @@ class NmacdRsiStrategy(BaseStrategy):
             self.hist.to_csv("tmp_hist_%s.csv" % self.symbol)
             self.enhanced.to_csv("tmp_signals_%s.csv" % self.symbol)
         else:
+            print(order_hint_str)
             asyncio.get_event_loop().create_task(
                 self.bot.send_message(
                     chat_id=chat_id,
