@@ -120,23 +120,18 @@ class BinanceFutureEngine(BaseEngine):
             klines_df[col] = klines_df[col].astype(float)
         return klines_df
     
-    def _remove_current_kline(self, klines):
-        t = kline_interval_map[self.opts.hist_interval]
-        now = int(time.time())
-        if int(klines.iloc[-1].t / 1000)== now - now % t:
-            return klines.iloc[:-1]
-        return klines
+    def is_last_hist_kline_closed(self):
+        interval = kline_interval_map[self.opts.hist_interval]
+        return self.is_last_kline_closed(self._hist, interval)
 
     async def init_hist(self):
         self._hist = await self.get_kline()
-        self._hist = self._remove_current_kline(self._hist)
 
     async def update_hist(self):
         self.strategy.on_update_hist()
         last_t = self._hist.iloc[-2]["t"]
         klines = await self.get_kline(start_str=int(last_t))
-        self._hist.combine_first(klines)
-        self._hist = self._remove_current_kline(self._hist)
+        self._hist = self._hist.combine_first(klines)
         self._runtime["last_update_hist_t"] = time.time()
 
     def hist_need_auto_update(self):
@@ -186,8 +181,13 @@ class BinanceFutureEngine(BaseEngine):
     async def _open_order(self, order):
         pass
 
-    async def close_all_order(self):
-        await self.async_client.futures_cancel_orders(symbol=self.opts.symbol)
+    async def close_all_position(self):
+        pass
+
+    async def cancel_all_order(self):
+        # TODO
+        return
+        await self.async_client.futures_cancel_all_open_orders(symbol=self.opts.symbol)
 
 
 # %%

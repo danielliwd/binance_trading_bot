@@ -75,9 +75,9 @@ class BaseEngine:
         self.strategy = strategy
         self.strategy.engine = self
         self.opts = opts or BaseOptions()
-        self.api_key = api_key or SecretKeys.get(self.opts.api_key_prefix + "_KEY")
+        self.api_key = api_key or SecretKeys.get(self.opts.api_key_prefix + "KEY")
         self.api_secret = api_secret or SecretKeys.get(
-            self.opts.api_key_prefix + "_SECRET"
+            self.opts.api_key_prefix + "SECRET"
         )
 
         # running context
@@ -95,6 +95,16 @@ class BaseEngine:
         init history klines
         """
         self._hist = Fake.hist()
+    
+    def is_last_hist_kline_closed(self):
+        return False
+
+    def is_last_kline_closed(self, klines, kline_interval=60*60):
+        last_kline_ts = int(klines.iloc[-1].t/1000)
+        now = int(time.time())
+        if now - now % kline_interval > last_kline_ts:
+            return True
+        return False
 
     async def _open_order(self, order):
         pass

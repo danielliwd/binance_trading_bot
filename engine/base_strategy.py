@@ -18,6 +18,9 @@ class BaseStrategy:
     def hist(self)->pd.DataFrame:
         return self.engine._hist
     
+    def is_last_hist_kline_closed(self):
+        return self.engine.is_last_hist_kline_closed()
+    
     def hist_need_update(self):
         """
         if self.auto_update_hist:
