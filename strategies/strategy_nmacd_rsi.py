@@ -65,8 +65,11 @@ class NmacdRsiStrategy(BaseStrategy):
             pd.to_datetime(signal_kline_index)
             .tz_localize("UTC")
             .tz_convert("Asia/Shanghai")
-        ).strftime("%Y-%m-%d %H:%M:%SZ+8")
-        dt = datetime.now().astimezone(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%SZ+8")
+        )
+        dt = datetime.now().astimezone(timezone(timedelta(hours=8)))
+        if dt - dtkline > timedelta(minutes=30):
+            hist_signal_str = "【非即时】"
+        dtkline_str = dtkline.strftime("%Y-%m-%d %H:%M:%SZ+8")
         price = self.hist.loc[signal_kline_index]["c"]
         stop_loss = 10
         if signal > 0:
@@ -84,7 +87,7 @@ class NmacdRsiStrategy(BaseStrategy):
             take_profit_price_1 = price - (stop_loss_price - price)
             take_profit_price_2 = price - (stop_loss_price - price) * 2
 
-        order_hint_str = f"{side}{self.symbol} 当前时间 {dt} 以价格{price:.2f} {buy_sell} {order_size:.2f}USDT. 止损价 {stop_loss_price:.2f}. 1:1止盈价 {take_profit_price_1:.2f}  1:2止盈价 {take_profit_price_2:.2f}. 信号出现蜡烛时间 {dtkline}."
+        order_hint_str = f"{hist_signal_str}{side}{self.symbol} K线时间{dtkline_str} 以价格{price:.2f} {buy_sell} {order_size:.2f}USDT. 止损价 {stop_loss_price:.2f}. 1:1止盈价 {take_profit_price_1:.2f}  1:2止盈价 {take_profit_price_2:.2f}. "
 
         return  order_hint_str
 
@@ -151,10 +154,12 @@ class NmacdRsiStrategy(BaseStrategy):
             self.enhanced.to_csv("tmp_signals_%s.csv" % self.symbol)
         else:
             print(order_hint_str)
+            dt = datetime.now().astimezone(timezone(timedelta(hours=8)))
+            dtstr = dt.strftime("%Y-%m-%d %H:%M:%SZ+8")
             asyncio.get_event_loop().create_task(
                 self.bot.send_message(
                     chat_id=chat_id,
-                    text="%s%s -- NMACD_RSI策略" % (test_str, order_hint_str),
+                    text="%s%s -- NMACD_RSI策略 %s" % (test_str, order_hint_str, dtstr),
                 )
             )
 
