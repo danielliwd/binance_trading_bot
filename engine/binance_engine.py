@@ -183,8 +183,34 @@ class BinanceFutureEngine(BaseEngine):
         pass
 
     async def close_all_position(self):
-        pos = await self.async_client.futures_position_information(symbol=self.opts.symbol)
-        print(pos)
+        resp = await self.async_client.futures_position_information(symbol=self.opts.symbol)
+        print(resp)
+        # https://binance-docs.github.io/apidocs/futures/en/#new-order-trade0
+        for pos in resp:
+            close_position_args = None
+            if float(pos["positionAmt"]) > 0 and pos["positionSide"] == "LONG":
+                close_position_args = {
+                    "symbol": self.opts.symbol,
+                    "side": "SELL",
+                    "positionSide": "LONG",
+                    "timestamp": int(time.time() * 1000),
+                    "type": "MARKET",
+                    "quantity": pos["positionAmt"],
+                }
+            elif float(pos["positionAmt"]) < 0 and pos["positionSide"] == "SHORT":
+                close_position_args = {
+                    "symbol": self.opts.symbol,
+                    "side": "BUY",
+                    "positionSide": "SHORT",
+                    "timestamp": int(time.time() * 1000),
+                    "type": "MARKET",
+                    "quantity": pos["positionAmt"].replace("-", ""),
+                    #"quantity": pos["notional"].replace("-", ""),
+                }
+            if close_position_args:
+                close_position_args["timestamp"] = int(time.time() * 1000)
+                order_res = await self.async_client.futures_create_order(**close_position_args)
+                print("close position resposne:", order_res)
         # TODO:
         # await self.cancel_all_order()
 

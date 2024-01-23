@@ -100,7 +100,7 @@ class NmacdRsiStrategy(BaseStrategy):
         if signal_idx:
             if is_new and self.opts.test:
                 # 只在测试开单
-                task = asyncio.get_event_loop().create_task(self.engine.close_all_positi())
+                task = asyncio.get_event_loop().create_task(self.engine.close_all_position())
                 task.add_done_callback(lambda _: self.notice_signal(signal_idx))
             else:
                 self.notice_signal(signal_idx)
