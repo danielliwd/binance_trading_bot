@@ -1,6 +1,7 @@
 import asyncio
 import pandas as pd
 import time
+from datetime import datetime, timezone, timedelta
 
 import pandas_ta
 from engine.base_strategy import BaseStrategy
@@ -60,27 +61,30 @@ class NmacdRsiStrategy(BaseStrategy):
         if signal == 0:
             return
 
-        dt = (
+        dtkline = (
             pd.to_datetime(signal_kline_index)
             .tz_localize("UTC")
             .tz_convert("Asia/Shanghai")
-        )
+        ).strftime("%Y-%m-%d %H:%M:%SZ+8")
+        dt = datetime.now().astimezone(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%SZ+8")
         price = self.hist.loc[signal_kline_index]["c"]
         stop_loss = 10
         if signal > 0:
-            buy_sell = "买"
+            buy_sell = "买入"
+            side = "【多】"
             stop_loss_price = self.enhanced.loc[signal_kline_index]["ma2min"]
             order_size = stop_loss / (price - stop_loss_price) * price
             take_profit_price_1 = price + price - stop_loss_price
             take_profit_price_2 = price + (price - stop_loss_price) * 2
         else:
-            buy_sell = "卖"
+            buy_sell = "卖出"
+            side = "【空】"
             stop_loss_price = self.enhanced.loc[signal_kline_index]["ma2max"]
             order_size = stop_loss / (stop_loss_price - price) * price
             take_profit_price_1 = price - (stop_loss_price - price)
             take_profit_price_2 = price - (stop_loss_price - price) * 2
 
-        order_hint_str = f"{dt.strftime('%Y-%m-%d %H:%M:%SZ+8')} {self.symbol} 以价格{price:.2f} {buy_sell} {order_size:.2f}USDT 止损价 {stop_loss_price:.2f} 1:1止盈价 {take_profit_price_1:.2f}  1:2止盈价 {take_profit_price_2:.2f}"
+        order_hint_str = f"{side}{self.symbol} 当前时间 {dt} 以价格{price:.2f} {buy_sell} {order_size:.2f}USDT. 止损价 {stop_loss_price:.2f}. 1:1止盈价 {take_profit_price_1:.2f}  1:2止盈价 {take_profit_price_2:.2f}. 信号出现蜡烛时间 {dtkline}."
 
         return  order_hint_str
 
@@ -139,7 +143,7 @@ class NmacdRsiStrategy(BaseStrategy):
         if not self.bot:
             self.bot = get_bot(tg_token, self.engine.opts.proxy_url)
 
-        test_str = "" if not self.engine.opts.test else "[测试]"
+        test_str = "" if not self.engine.opts.test else "[测试]:"
         order_hint_str = self.order_hint(signal_idx)
         if self.engine.opts.test:
             print(order_hint_str)
@@ -150,7 +154,7 @@ class NmacdRsiStrategy(BaseStrategy):
             asyncio.get_event_loop().create_task(
                 self.bot.send_message(
                     chat_id=chat_id,
-                    text="NMACD_RSI策略%s: %s" % (test_str, order_hint_str),
+                    text="%s%s -- NMACD_RSI策略" % (test_str, order_hint_str),
                 )
             )
 
@@ -178,6 +182,6 @@ def main(symbol, test=True):
 if __name__ == "__main__":
     import sys
 
-    symbol = sys.argv[1] if len(sys.argv) > 1 else "SUIUSDT"
+    symbol = sys.argv[1] if len(sys.argv) > 1 else "AUCTIONUSDT"
     test = False if len(sys.argv) > 2 and sys.argv[2] == "product" else True
     main(symbol, test)
