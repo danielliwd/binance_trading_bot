@@ -1,4 +1,3 @@
-import pydantic
 import logging
 import time
 import pandas as pd
@@ -6,6 +5,7 @@ import asyncio
 
 
 from engine.base_strategy import BaseStrategy
+from engine.base_structs import BaseOptions, SymbolInfo
 from tools.readkeys import SecretKeys
 from datetime import datetime
 from tools.make_async import make_async
@@ -42,16 +42,6 @@ class Fake:
             }
 
 
-PROCESS_TIMEOUT_MS = 10 * 1000  # on_tick 超时时间， 超时处理将会在 on_proccess_timeout 中处理
-API_KEY_PREFIX = "API_"
-
-
-class BaseOptions(pydantic.BaseModel):
-    symbol: str = "ETHUSDT"
-    proxy_url: str = None
-    process_timeout_ms: int = PROCESS_TIMEOUT_MS
-    api_key_prefix: str = API_KEY_PREFIX
-    test: bool = False
 
 
 class BaseEngine:
@@ -79,6 +69,9 @@ class BaseEngine:
         self.api_secret = api_secret or SecretKeys.get(
             self.opts.api_key_prefix + "SECRET"
         )
+        self.async_client = None
+        self.ws_client = None
+        self.symbol_info: SymbolInfo = None
 
         # running context
         self._hist = None
@@ -87,8 +80,11 @@ class BaseEngine:
         self._runtime = {}
 
     def init_client(self):
-        self.async_client = None
-        self.ws_client = None
+        pass
+
+    async def init_symbol(self):
+        self.symbol_info = SymbolInfo("ETHUSDT", 2)
+        pass
 
     def init_hist(self):
         """
@@ -155,6 +151,8 @@ class BaseEngine:
     async def _trading_strategy(self, dispatcher, contents):
         """
         基类隐式实现，不要重写
+
+        on_tick(tick)
         """
         disptcher_type, msg = self.parse_conents(contents)
         if disptcher_type not in dispatcher:
@@ -176,6 +174,7 @@ class BaseEngine:
             )
         else:
             # skip message if process is not done
+            # TODO: 按 dispatcher 调用不同的 _latency
             self.strategy.on_tick_latency(contents)
 
     def hist_need_auto_update(self):
@@ -236,6 +235,7 @@ class BaseEngine:
     async def run(self):
         self.strategy.pre_init()
         await make_async(self.init_client)()
+        await make_async(self.init_symbol)()
         await make_async(self.init_hist)()
         self.strategy.post_init()
         asyncio.create_task(self._update_hist_loop())

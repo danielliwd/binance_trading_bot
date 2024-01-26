@@ -1,4 +1,5 @@
 import pandas as pd
+from engine.base_structs import SymbolInfo, KlineTick
 
 class BaseStrategy:
     def __init__(self):
@@ -9,11 +10,15 @@ class BaseStrategy:
     @property
     def symbol(self):
         return self.engine.opts.symbol
+
+    @property
+    def symbol_info(self) -> SymbolInfo:
+        return self.engine.symbol_info
     
     @property
     def opts(self):
         return self.engine.opts
-
+    
     @property
     def hist(self)->pd.DataFrame:
         return self.engine._hist
@@ -43,7 +48,7 @@ class BaseStrategy:
     def post_open_order(self, order):
         pass
 
-    def on_tick(self, tick):
+    def on_tick(self, tick: KlineTick):
         pass
 
     def pre_update_hist(self):

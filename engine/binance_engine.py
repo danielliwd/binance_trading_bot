@@ -3,7 +3,9 @@ from tools.binance_ws_patcher import monkey_patch
 # **!重要** binance需要代理, binance ws代理patch.
 monkey_patch()
 
-from engine.base_engine import BaseEngine, BaseOptions
+from engine.base_engine import BaseEngine
+from engine.base_structs import BaseOptions, SymbolInfo
+from engine.binance_structs import BinanceKlineTick
 from binance.client import BaseClient
 from binance import BinanceSocketManager, AsyncClient
 from binance.enums import FuturesType, HistoricalKlinesType
@@ -34,30 +36,6 @@ class BinanceOptions(BaseOptions):
     hist_interval: str = BaseClient.KLINE_INTERVAL_1HOUR
 
 
-class Candle(pydantic.BaseModel):
-    t: int = pydantic.Field(alias="t")  # kline time start
-    e: int = pydantic.Field(alias="T")  # kline time end
-    interval: str = pydantic.Field(alias="i")
-    ## skip fields
-    # first_trade_id: int = pydantic.Field(alias="f")
-    # last_trade_id: int = pydantic.Field(alias="L")
-    # n: int = pydantic.Field(alias="n")  # number of trades
-    o: float = pydantic.Field(alias="o")  # open
-    h: float = pydantic.Field(alias="h")  # high
-    l: float = pydantic.Field(alias="l")  # low
-    c: float = pydantic.Field(alias="c")  # close
-    v: float = pydantic.Field(alias="v")  # volume
-    q: float = pydantic.Field(alias="q")  # quote volume
-    close: bool = pydantic.Field(alias="x")  # is this kline closed?
-
-
-class BinanceKlineTick(pydantic.BaseModel):
-    event: str = pydantic.Field(alias="e")
-    symbol: str = pydantic.Field(alias="ps")
-    contract_type: str = pydantic.Field(alias="ct")
-    t: int = pydantic.Field(alias="E")
-    k: Candle = pydantic.Field(alias="k")
-
 
 class BinanceFutureEngine(BaseEngine):
     def __init__(
@@ -80,6 +58,11 @@ class BinanceFutureEngine(BaseEngine):
             self.ws_client.proxy_url = self.opts.proxy_url
         else:
             self.ws_client.proxy_url = None
+        
+    async def init_symbol(self):
+        exchange_info = await self.async_client.futures_exchange_info()
+        syms = [s for s in exchange_info["symbols"] if s["symbol"] == self.opts.symbol]
+        self.symbol_info = SymbolInfo(symbol=self.opts.symbol, quantity_precision=syms[0]["quantityPrecision"])
 
     async def get_kline(self, limit=None, start_str=None):
         kws = {}
@@ -180,11 +163,31 @@ class BinanceFutureEngine(BaseEngine):
         }
 
     async def _open_order(self, order):
-        pass
+        await self.close_all_position()
+        open_position_args = {
+            "symbol": self.opts.symbol,
+            "side": order["side"],
+            "positionSide": "LONG" if order["side"] == "BUY" else "SHORT",
+            "timestamp": int(time.time() * 1000),
+            "type": "MARKET",
+            "quantity": order["quantity"],
+        }
+        order_res = await self.async_client.futures_create_order(**open_position_args)
+        print("---- open position response ----", order_res)
+    
+    async def get_position(self):
+        resp = await self.async_client.futures_position_information(symbol=self.opts.symbol)
+        for pos in resp:
+            if float(pos["positionAmt"]) > 0 and pos["positionSide"] == "LONG":
+                return "LONG", pos["positionAmt"]
+            elif float(pos["positionAmt"]) < 0 and pos["positionSide"] == "SHORT":
+                return "SHORT", pos["positionAmt"].replace("-", "")
+            
+        return None, None
 
     async def close_all_position(self):
         resp = await self.async_client.futures_position_information(symbol=self.opts.symbol)
-        print(resp)
+        print("---- position ----", resp)
         # https://binance-docs.github.io/apidocs/futures/en/#new-order-trade0
         for pos in resp:
             close_position_args = None
@@ -211,8 +214,7 @@ class BinanceFutureEngine(BaseEngine):
                 close_position_args["timestamp"] = int(time.time() * 1000)
                 order_res = await self.async_client.futures_create_order(**close_position_args)
                 print("close position resposne:", order_res)
-        # TODO:
-        # await self.cancel_all_order()
+        await self.cancel_all_order()
 
     async def cancel_all_order(self):
         await self.async_client.futures_cancel_all_open_orders(symbol=self.opts.symbol)
